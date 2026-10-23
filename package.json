@@ -1,0 +1,14 @@
+{
+  "name": "wordwolf-withais",
+  "version": "0.1.0",
+  "description": "人間1〜2人 + 独立したAI3人で遊ぶブラウザ版ワードウルフ",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}
