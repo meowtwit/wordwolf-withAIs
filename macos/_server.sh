@@ -17,8 +17,17 @@ if [ -z "$NODE" ]; then
   exit 1
 fi
 
-URL="http://localhost:3000"
-alive() { curl -s -o /dev/null --max-time 1 "http://127.0.0.1:3000/api/health"; }
+export PORT=3939
+URL="http://localhost:$PORT"
+# このゲームのサーバーが動いているか（古い版や別のアプリと見分ける）
+alive() { curl -fs --max-time 1 "http://127.0.0.1:$PORT/api/health" | grep -q 'tsukiyo-wordwolf-kiosk'; }
+port_busy() { curl -s -o /dev/null --max-time 1 "http://127.0.0.1:$PORT/"; }
+
+if ! alive && port_busy; then
+  echo "別のアプリがポート $PORT を使っています。Mac を再起動してから、もう一度ためしてください。"
+  read -r -n 1 -p "何かキーを押すと閉じます"
+  exit 1
+fi
 
 if ! alive; then
   mkdir -p "$DIR/data"

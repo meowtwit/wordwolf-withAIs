@@ -21,6 +21,8 @@ loadSettings();
 process.title = 'WordWolf-Server';
 
 const PORT = Number(process.env.PORT) || 3000;
+// 起動スクリプトが「このゲームのサーバーか」を確かめるための目印（古い版とポートがぶつかったときの見分け用）
+const APP_ID = 'tsukiyo-wordwolf-kiosk';
 // 展示用: 既定ではこの PC からしか開けない（ほかの PC から開くなら HOST=0.0.0.0）
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = join(ROOT, 'public');
@@ -166,7 +168,7 @@ async function handleApi(req, res, url) {
 
   if (parts[1] === 'admin') return handleAdmin(req, res, parts);
   if (method === 'GET' && parts[1] === 'kiosk') return send(res, 200, kioskConfig());
-  if (method === 'GET' && parts[1] === 'health') return send(res, 200, { ok: true });
+  if (method === 'GET' && parts[1] === 'health') return send(res, 200, { ok: true, app: APP_ID });
   if (method === 'POST' && parts[1] === 'games' && parts.length === 2) {
     const body = await readBody(req);
     const game = createGame(buildGameConfig(Number(body.humans) || 1));
@@ -222,7 +224,8 @@ async function serveStatic(res, pathname) {
     const ext = extname(file).toLowerCase();
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': ext === '.webp' || ext === '.png' ? 'max-age=3600' : 'no-cache',
+      // 画面の作り（HTML/JS/CSS）は保存させない（古い版が表示され続けないように）
+      'Cache-Control': ext === '.webp' || ext === '.png' ? 'max-age=3600' : 'no-store',
     });
     res.end(data);
   } catch {
