@@ -74,7 +74,7 @@ async function postJson(url, headers, body, timeoutMs) {
   });
   const text = await res.text();
   if (!res.ok) {
-    const err = new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
+    const err = new Error(`HTTP ${res.status}: ${text.slice(0, 1500)}`);
     err.status = res.status;
     throw err;
   }
@@ -173,7 +173,7 @@ async function acquire(provider, maxWaitMs) {
 }
 
 function noteRateLimit(provider, err) {
-  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(err.message || '');
+  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(err.message || '') || /retry in (\d+(?:\.\d+)?)s/i.exec(err.message || '');
   const sec = m ? Number(m[1]) : 10;
   blockedUntil.set(provider, Date.now() + Math.min(sec, 60) * 1000);
 }

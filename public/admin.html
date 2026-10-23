@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理画面 — 月夜のワードウルフ</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23f3d88b'/><circle cx='68' cy='40' r='38' fill='%230f1b26'/></svg>">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow-y: auto; }
+    .admin { max-width: 1180px; margin: 0 auto; padding: 18px max(16px, env(safe-area-inset-left, 0px)) 110px; display: flex; flex-direction: column; gap: 16px; }
+    .admin h1 { font-family: var(--f-display); font-weight: 400; font-size: 22px; margin: 0; }
+    .admin h2 { margin-bottom: 4px; }
+    .admin .lead { margin: 0 0 12px; }
+    .grid2 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .chars { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); }
+    .char { display: grid; grid-template-columns: 120px 1fr; gap: 14px; background: var(--night); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 14px; padding: 14px; min-width: 0; }
+    .char.off { opacity: .55; }
+    .char img { width: 120px; height: 160px; object-fit: cover; border-radius: 10px; background: #f4ecdc; }
+    .char .fields { display: grid; gap: 4px 12px; grid-template-columns: 1fr 1fr; min-width: 0; }
+    .char .full { grid-column: 1 / -1; }
+    textarea { width: 100%; min-height: 96px; padding: 8px 10px; border-radius: 10px; background: var(--night-2); border: 1px solid var(--line); color: var(--mist); font: inherit; font-size: 14px; resize: vertical; }
+    input[type=number], input[type=password], input[type=color] { padding: 8px 10px; border-radius: 10px; background: var(--night); border: 1px solid var(--line); width: 100%; }
+    input[type=color] { height: 40px; padding: 2px; }
+    input[type=range] { width: 100%; }
+    .btn.small { white-space: nowrap; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+    .check input { width: 18px; height: 18px; accent-color: var(--moon); }
+    .savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: rgba(15, 27, 38, .96); border-top: 1px solid var(--line); padding: 12px 16px; }
+    .savebar .inner { max-width: 1180px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .ok { color: var(--pine); }
+    .warn { color: var(--wolf); }
+    .kv { display: grid; grid-template-columns: 200px 1fr; gap: 6px 12px; font-size: 14px; }
+    .result-box { font-size: 14px; background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 640px) { .chars { grid-template-columns: 1fr; } .char { grid-template-columns: 1fr; } .char img { width: 100%; height: 180px; } .char .fields { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="admin" id="app">
+    <p class="muted">読み込み中…</p>
+  </div>
+  <div class="savebar" id="savebar" hidden>
+    <div class="inner">
+      <span id="savemsg" class="muted">変更したら「保存する」を押してください。保存すると、次のゲームから反映されます。</span>
+      <div class="row"><a class="btn" href="/" target="_blank" rel="noopener">ゲーム画面を開く</a><button class="btn moonlit" type="button" id="save">保存する</button></div>
+    </div>
+  </div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

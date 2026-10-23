@@ -28,7 +28,10 @@ function describeLog(view) {
 }
 
 function systemPrompt(view) {
-  const persona = PERSONALITIES[view.self.personality] || PERSONALITIES.analyst;
+  const preset = PERSONALITIES[view.self.personality] || PERSONALITIES.analyst;
+  const persona = view.self.persona?.personality
+    ? `性格: ${view.self.persona.personality}${view.self.persona.speech ? `\n- 話し方: ${view.self.persona.speech}` : ''}`
+    : `性格: ${preset.label} — ${preset.prompt}`;
   return `あなたはワードウルフというゲームのプレイヤー「${view.self.name}」です。
 
 # ルール
@@ -40,13 +43,13 @@ function systemPrompt(view) {
 
 # あなたの情報
 - あなたのお題: 「${view.self.word}」
-- 性格: ${persona.label} — ${persona.prompt}
+- ${persona}
 
 # 心得
 - お題の単語そのもの（「${view.self.word}」）は絶対に口にしない。
 - 具体的すぎるとウルフにお題がばれる。抽象的すぎると自分が疑われる。そのバランスを取る。
 - 他の人の発言が自分のお題とかみ合わなければ、自分がウルフの可能性も考え、周りに話を合わせる。
-- 日本語の話し言葉で、性格に合った口調で話す。
+- 日本語の話し言葉で、性格と話し方の設定に合った口調で話す。
 - 出力は指定された JSON のみ。説明文やコードブロックは付けない。
 
 # プレイヤー

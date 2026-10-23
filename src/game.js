@@ -57,6 +57,9 @@ export function createGame(config, { rng = Math.random, ai = defaultAI, now = Da
       name: (a.name || `AI${i + 1}`).trim().slice(0, 10),
       type: 'ai',
       personality: a.personality || 'analyst',
+      // キャラクター設定（展示用）。persona があれば性格・口調はこちらを使う
+      persona: a.persona ? { personality: a.persona.personality || '', speech: a.persona.speech || '' } : null,
+      look: { image: a.image || '', color: a.color || '', tagline: a.tagline || '', voicePitch: a.voicePitch || 1 },
       provider: a.provider || 'mock',
       model: a.model || '',
     })),
@@ -107,7 +110,7 @@ export function currentActor(game) {
 /** AI に渡す情報。自分のお題と公開情報だけ。 */
 export function aiView(game, player) {
   return {
-    self: { id: player.id, name: player.name, personality: player.personality, word: player.word },
+    self: { id: player.id, name: player.name, personality: player.personality, persona: player.persona, word: player.word },
     players: game.order.map((id) => ({ id, name: nameOf(game, id), human: byId(game, id).type === 'human' })),
     log: game.log.map((l) => ({ ...l })),
     turn: turnOf(game),
@@ -346,7 +349,7 @@ export function publicState(game) {
       const p = byId(game, id);
       return {
         id: p.id, name: p.name, type: p.type,
-        ...(p.type === 'ai' ? { personality: p.personality, provider: p.provider, model: p.model } : {}),
+        ...(p.type === 'ai' ? { personality: p.personality, provider: p.provider, model: p.model, ...p.look } : {}),
       };
     }),
     cursor: game.cursor,

@@ -7,20 +7,21 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23f3d88b'/><circle cx='68' cy='40' r='38' fill='%230f1b26'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-screen="title">
   <div class="shell">
     <header class="top">
       <div class="brand"><div class="moon" aria-hidden="true"></div><h1>月夜のワードウルフ</h1></div>
-      <div class="status" id="status"></div>
+      <div class="row"><div class="status" id="status"></div><button class="btn small ghost" type="button" id="quit">タイトルへ</button></div>
     </header>
     <nav class="steps" id="steps" hidden></nav>
     <aside class="side" id="side" hidden></aside>
     <main id="main" aria-live="polite"></main>
     <div id="dock"></div>
   </div>
+  <div class="overlay" id="overlay" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

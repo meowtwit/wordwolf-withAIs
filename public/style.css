@@ -15,9 +15,9 @@
   --c-ai3: #c3a4ff;
   --c-ai4: #7fd8e6;
   --c-h1: #74c7a3;
-  --c-h2: #f0b37a;
+  --c-h2: #7fd8e6;
   --f-display: "Dela Gothic One", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif;
-  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+  --f-body: "Zen Maru Gothic", "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
   --r: 14px;
   color-scheme: dark;
 }
@@ -242,3 +242,109 @@ details summary { cursor: pointer; }
   .steps .step span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+
+/* ===== 展示（キオスク）用 ===== */
+.btn.ghost { background: transparent; }
+.btn.huge { padding: 18px 56px; font-size: 24px; letter-spacing: .1em; font-family: var(--f-display); font-weight: 400; }
+.pulse { animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 12px #f3d88b22, 0 0 40px #f3d88b55; transform: scale(1.03); } }
+.narrow { max-width: 760px; margin-inline: auto; }
+
+/* タイトルと人数えらびでは、ヘッダーなどを隠して画面いっぱいに */
+body[data-screen="title"] header.top,
+body[data-screen="title"] .steps,
+body[data-screen="title"] #dock { display: none; }
+body[data-screen="title"] .shell { max-width: none; padding: 0; }
+body[data-screen="title"] main { padding: 0; overflow: hidden; }
+body[data-screen="title"] #quit,
+body[data-screen="mode"] #quit,
+body[data-screen="result"] #quit,
+body[data-screen="loading"] #quit { display: none; }
+body[data-screen="mode"] .steps, body[data-screen="rules"] .steps, body[data-screen="roulette"] .steps, body[data-screen="reveal"] .steps { display: none; }
+
+.title {
+  position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh;
+  cursor: pointer; background: radial-gradient(ellipse at center, #26294d 0%, #121527 70%);
+  padding: 2vh 16px 3vh;
+}
+.title-img { max-width: 100%; max-height: calc(100% - 130px); object-fit: contain; border-radius: 18px; box-shadow: 0 20px 60px #0008; }
+.title-cta { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.title-cta p { margin: 0; color: var(--mist-dim); font-size: 14px; letter-spacing: .08em; }
+
+/* 人数えらび */
+.mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding-block: 4vh; text-align: center; min-height: 100%; }
+.mode h2 { font-size: 28px; }
+.mode-cards { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); width: min(820px, 100%); }
+.mode-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 18px; border-radius: 20px; cursor: pointer;
+  background: var(--night-2); border: 2px solid var(--line); transition: transform .15s, border-color .15s;
+}
+.mode-card:hover, .mode-card:focus-visible { border-color: var(--moon); transform: translateY(-3px); }
+.mode-card b { font-family: var(--f-display); font-weight: 400; font-size: 24px; color: var(--moon); letter-spacing: .06em; }
+.mode-card > span:last-child { color: var(--mist-dim); }
+.mode-faces { display: flex; justify-content: center; }
+.mode-faces img { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; object-position: 50% 28%; background: #f4ecdc; border: 3px solid var(--night-2); margin-left: -16px; }
+.mode-faces img:first-child { margin-left: 0; }
+
+/* ルール説明 */
+.rules { max-width: 980px; margin: 0 auto; padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; }
+.rules h2 { font-size: 26px; text-align: center; margin: 0; }
+.rules-head { display: flex; justify-content: space-between; align-items: center; }
+.rules-no { font-family: var(--f-display); color: var(--moon); font-size: 13px; letter-spacing: .1em; }
+.rules-body { font-size: 17px; line-height: 1.9; text-align: center; }
+.rules-body p { margin: 10px 0; }
+.rules-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; }
+.dots-nav { display: flex; gap: 8px; }
+.dots-nav i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.dots-nav i.on { background: var(--moon); }
+.wcards { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 6px 0 10px; }
+.wcard { width: 120px; padding: 14px 8px; border-radius: 14px; background: #f6efe0; color: #3a2d1a; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 18px #0006; }
+.wcard span { font-size: 12px; color: #8a7350; }
+.wcard b { font-family: var(--f-display); font-weight: 400; font-size: 28px; }
+.wcard.odd { outline: 3px solid var(--wolf); transform: rotate(3deg); }
+.members { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.member { width: 170px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; border-radius: 16px; background: var(--night); border: 2px solid var(--c); }
+.member-face { width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; background: var(--c); color: var(--night); font-size: 40px; font-weight: 700; }
+.member-face.pic { object-fit: cover; object-position: 50% 28%; background: #f4ecdc; }
+.member b { font-size: 19px; color: var(--c); }
+.member span { font-size: 13px; color: var(--mist-dim); line-height: 1.5; }
+.howto { list-style: none; padding: 0; margin: 0 auto; display: grid; gap: 10px; max-width: 760px; text-align: left; counter-reset: none; }
+.howto li { display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--night); border: 1px solid var(--line); }
+.howto li b { font-family: var(--f-display); font-weight: 400; color: var(--moon); letter-spacing: .04em; }
+.howto li span { font-size: 15px; line-height: 1.7; }
+.winlose { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.winlose > div { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 12px; background: var(--night); border: 1px solid var(--line); font-size: 15px; }
+.winlose .win { color: var(--pine); font-family: var(--f-display); font-size: 20px; }
+.winlose .lose { color: var(--wolf); font-family: var(--f-display); font-size: 20px; }
+.winlose em { font-style: normal; color: var(--moon); font-weight: 700; }
+.tips { text-align: left; max-width: 760px; margin: 0 auto; padding-left: 1.4em; font-size: 15px; line-height: 1.8; }
+
+/* キャラクターの顔 */
+.face.pic { object-fit: cover; object-position: 50% 28%; background: #f4ecdc; box-shadow: 0 0 0 2px var(--c); }
+.tface { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; vertical-align: middle; margin-right: 6px; background: var(--c); color: var(--night); font-size: 11px; font-weight: 700; }
+.tface.pic { object-fit: cover; object-position: 50% 28%; background: #f4ecdc; }
+.target { display: inline-flex; align-items: center; padding: 4px 14px 4px 4px; font-size: 15px; }
+.big-face { width: 120px; height: 120px; border-radius: 50%; margin: 8px auto 0; display: grid; place-items: center; background: var(--c); color: var(--night); font-size: 40px; font-weight: 700; }
+.big-face.pic { object-fit: cover; object-position: 50% 28%; background: #f4ecdc; box-shadow: 0 0 0 4px var(--c), 0 0 30px color-mix(in srgb, var(--c) 40%, transparent); }
+.verdict-faces { display: flex; justify-content: center; }
+.banner.now { border-left-color: var(--pine); font-size: 16px; }
+details.mind summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* 放置したときの確認 */
+.overlay { position: fixed; inset: 0; z-index: 50; background: #050912cc; display: grid; place-items: center; padding: 16px; }
+.overlay .idle { max-width: 520px; width: 100%; }
+
+@media (min-width: 1024px) {
+  .msg .face { width: 40px; height: 40px; }
+  .side .v .face { width: 48px; height: 48px; }
+  .side .v { grid-template-columns: 18px 48px 1fr; }
+}
+@media (max-width: 720px) {
+  .howto li { grid-template-columns: 1fr; gap: 2px; }
+  .winlose { grid-template-columns: 1fr; }
+  .rules { padding: 16px; }
+  .rules h2 { font-size: 21px; }
+  .member { width: 140px; }
+  .member-face { width: 84px; height: 84px; }
+}
