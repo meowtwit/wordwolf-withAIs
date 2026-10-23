@@ -1,6 +1,6 @@
 // AI プレイヤーの頭脳。各 AI には「自分のお題・公開ログ・性格・自分の過去の推理」だけを渡す。
 // 他プレイヤーのお題やウルフの正体は view に含まれないので、構造的に漏れない。
-import { complete, readyIn as providerReadyIn, capacityAt } from './providers.js';
+import { complete } from './providers.js';
 import { mockTurn, mockVote, mockGuess, normalize } from './mockAI.js';
 
 export const PERSONALITIES = {
@@ -11,7 +11,7 @@ export const PERSONALITIES = {
   cynic: { label: '皮肉屋', prompt: '少し皮肉っぽく、人の発言を疑ってかかる。でも根拠はちゃんと述べる。' },
 };
 
-const KIND_LABEL = { say: '一言', question: '質問', answer: '回答', free: '自由会話' };
+const KIND_LABEL = { say: '一言', question: '質問', answer: '回答' };
 
 function describePlayers(view) {
   return view.players
@@ -34,7 +34,7 @@ function systemPrompt(view) {
 # ルール
 - 全員にお題（単語）が配られる。多数派は同じお題、1人だけ「ウルフ」として似ているが違うお題を持つ。
 - 誰がウルフか、自分がウルフかどうかは誰にも知らされていない。あなた自身がウルフの可能性もある。
-- 1ターン目: 順番に一言ずつ。2ターン目: 順番に、誰か1人へ質問し、相手が答える。3ターン目: 1分間の自由会話（@名前で呼びかけ、@allで全員）。4ターン目: 全員一斉投票。
+- 1ターン目: 順番に一言ずつ。2ターン目と3ターン目: 順番に、誰か1人へ質問し、相手が答える（質問は2周）。4ターン目: 全員一斉投票。
 - 最多票の人が追放される。ウルフが追放されれば多数派の勝ち、そうでなければウルフの勝ち。
 - ウルフが追放されても、多数派のお題を当てればウルフの逆転勝ち。
 
@@ -71,25 +71,14 @@ function taskText(view, task) {
   switch (task.kind) {
     case 'intro':
       return '1ターン目、あなたの番です。お題について「一言」だけ話してください（1文、40文字程度まで）。';
-    case 'ask':
-      return `2ターン目、あなたが質問する番です。他のプレイヤーから1人選び、その人がウルフかどうか探れる質問を1つしてください（1文、50文字程度まで）。
-質問相手の id を "to" に入れてください。候補: ${otherIds(view).join(', ')}`;
-    case 'answer':
-      return `2ターン目。${task.fromName} さんからあなたへの質問です:「${task.question}」
-これに答えてください（1〜2文、50文字程度まで）。`;
-    case 'free': {
-      const why = {
-        mention: `${task.fromName} さんがあなたを呼びました:「${task.triggerText}」 これに答えてください。`,
-        all: `${task.fromName} さんが全員に呼びかけました:「${task.triggerText}」 あなたも答えてください。`,
-        reply: `${task.fromName} さんの発言:「${task.triggerText}」 に反応してください。`,
-        idle: '会話が少し止まっています。誰か1人を @名前 で呼んで、話を振ってください。',
-      }[task.reason] || '';
-      return `3ターン目の自由会話中です（残り約${task.remainingSec}秒）。
-${why}
-- 短く1文、40文字程度まで。チャットのテンポで。
-- 誰かに聞きたいときは発言の中に「@名前」と書く（例: @${view.players.find((p) => p.id !== view.self.id)?.name}。id ではなく名前で。全員なら @all）。呼ぶのは多くても1人。毎回呼ぶ必要はない。
-- 呼ばれていない話に割り込みすぎない。`;
+    case 'ask': {
+      const second = task.round >= 2;
+      return `${view.turn}ターン目（質問${second ? 'の2周目' : ''}）、あなたが質問する番です。他のプレイヤーから1人選び、その人がウルフかどうか探れる質問を1つしてください（1文、50文字程度まで）。
+${second ? '1周目の質問と答えをふまえて、怪しいと思った人を深掘りするか、まだ確かめていない人に聞いてください。同じ質問の繰り返しは避けること。\n' : ''}質問相手の id を "to" に入れてください。候補: ${otherIds(view).join(', ')}`;
     }
+    case 'answer':
+      return `${view.turn}ターン目。${task.fromName} さんからあなたへの質問です:「${task.question}」
+これに答えてください（1〜2文、50文字程度まで）。`;
     default:
       return '';
   }
@@ -180,35 +169,22 @@ async function askLLM(player, system, user, opts = {}) {
   return parseJsonLoose(text);
 }
 
-/** この AI がいま API を呼べるまでの待ち時間（ms）。自由会話で、呼べない AI を後回しにするのに使う。 */
-export function readyIn(player) {
-  return player.provider === 'mock' ? 0 : providerReadyIn(player.provider);
-}
-
-/** untilTs の時点で、この AI の API にあと何回分の枠があるか。 */
-export function capacity(player, untilTs) {
-  return player.provider === 'mock' ? Infinity : capacityAt(player.provider, untilTs);
-}
-
-/** 「@ai2」のような id での呼びかけを「@ミオ」に直す。 */
+/** 発言に紛れ込んだ「ai2」「@h1」のような id を名前に直す。 */
 function idsToNames(text, view) {
   let t = text;
-  for (const p of [...view.players].sort((a, b) => b.id.length - a.id.length)) t = t.split(`@${p.id}`).join(`@${p.name}`);
+  for (const p of view.players) t = t.split(`@${p.id}`).join(p.name).split(p.id).join(p.name);
   return t;
 }
 
 /**
- * 1回分の行動（一言・質問・回答・自由会話）。
+ * 1回分の行動（一言・質問・回答）。
  * 返り値: { speech, to?, suspicions, strategy, wolfSelf, source, error? }
- * 自由会話で API が失敗したときは、オフライン発言で埋めずに { skip: true } を返す（会話が不自然にならないように）。
  */
 export async function aiTurn(player, view, task) {
   if (player.provider === 'mock') return { ...mockTurn(view, task), source: 'mock' };
-  const free = task.kind === 'free';
   try {
-    const opts = free ? { timeoutMs: task.timeoutMs || 12000, retry429: false, maxWaitMs: 1500 } : {};
-    const out = await askLLM(player, systemPrompt(view), turnPrompt(view, task), opts);
-    const speech = clip(maskWord(idsToNames(String(out.speech || ''), view), view.self.word), free ? 80 : 120);
+    const out = await askLLM(player, systemPrompt(view), turnPrompt(view, task));
+    const speech = clip(maskWord(idsToNames(String(out.speech || ''), view), view.self.word), 120);
     if (!speech) throw new Error('発言が空でした');
     const result = {
       speech,
@@ -223,7 +199,6 @@ export async function aiTurn(player, view, task) {
     }
     return result;
   } catch (e) {
-    if (free) return { skip: true, source: 'fallback', error: e.message, suspicions: view.memory?.suspicions || {}, strategy: '' };
     return { ...mockTurn(view, task), source: 'fallback', error: e.message };
   }
 }

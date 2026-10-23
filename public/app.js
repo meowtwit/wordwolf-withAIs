@@ -4,6 +4,19 @@ const main = $('#main');
 const dock = $('#dock');
 const statusEl = $('#status');
 const stepsEl = $('#steps');
+const sideEl = $('#side');
+const shellEl = $('.shell');
+/** ノートPCなど横に広い画面か（会話の横に順番を並べる2列表示にする） */
+const isWide = () => matchMedia('(min-width: 1024px)').matches;
+/** 大きい画面では主ボタンにフォーカスして、Enter / Space で進めるようにする */
+const focusPrimary = (sel) => { if (isWide()) $(sel)?.focus(); };
+
+/** 会話中だけ、話す順番の欄（ノートPCでは右側）を出す */
+function setTalking(on) {
+  shellEl.classList.toggle('talking', on);
+  sideEl.hidden = !on;
+  if (!on) sideEl.innerHTML = '';
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const AI_PRESETS = [
@@ -15,8 +28,8 @@ const AI_PRESETS = [
 const VOICE_PITCH = { ai1: 1.0, ai2: 1.35, ai3: 0.8, ai4: 1.15 };
 const STEPS = [
   { n: 1, label: 'ひとこと' },
-  { n: 2, label: '質問' },
-  { n: 3, label: '自由会話' },
+  { n: 2, label: '質問①' },
+  { n: 3, label: '質問②' },
   { n: 4, label: '一斉投票' },
 ];
 
@@ -50,26 +63,17 @@ const personalityLabel = (id) => config.personalities.find((p) => p.id === id)?.
 const providerLabel = (id) => config.providers.find((p) => p.id === id)?.label || id;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** 発言中の @名前 を色付けして HTML にする。 */
-function withMentions(text) {
-  let html = esc(text);
-  const names = [...game.players.map((p) => p.name), 'all', '全員', 'みんな'].sort((a, b) => b.length - a.length);
-  for (const n of names) html = html.split(`@${esc(n)}`).join(`\u0000${esc(n)}\u0001`);
-  return html.replace(/\u0000([^\u0001]*)\u0001/g, '<span class="mention">@$1</span>');
-}
-
 // ---------- 読み上げ ----------
 const tts = {
   ok: 'speechSynthesis' in window,
   voices: [],
   queue: Promise.resolve(),
-  pending: 0,
   load() { if (this.ok) { const v = speechSynthesis.getVoices().filter((x) => /^ja/i.test(x.lang)); if (v.length) this.voices = v; } },
   unlock() { if (this.ok) try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {} },
   speakNow(text, id) {
     return new Promise((res) => {
       try {
-        const u = new SpeechSynthesisUtterance(text.replace(/@/g, ''));
+        const u = new SpeechSynthesisUtterance(text);
         u.lang = 'ja-JP';
         const idx = Number(id.replace(/\D/g, '')) - 1;
         if (this.voices.length) u.voice = this.voices[idx % this.voices.length];
@@ -80,18 +84,13 @@ const tts = {
       } catch { res(); }
     });
   },
-  /** 読み上げを順番待ちに入れる。自由会話で溜まりすぎたら古いものは飛ばす。 */
+  /** 読み上げを順番待ちに入れる。 */
   say(text, id) {
     if (!this.ok || !setup.voice) return;
-    this.pending++;
-    const mine = this.pending;
-    this.queue = this.queue.then(async () => {
-      if (game?.phase === 'free' && this.pending - mine >= 2) return;
-      await this.speakNow(text, id);
-    }).finally(() => { if (mine === this.pending) this.pending = 0; });
+    this.queue = this.queue.then(() => this.speakNow(text, id));
   },
   idle() { return this.queue; },
-  stop() { if (this.ok) try { speechSynthesis.cancel(); } catch {} this.pending = 0; this.queue = Promise.resolve(); },
+  stop() { if (this.ok) try { speechSynthesis.cancel(); } catch {} this.queue = Promise.resolve(); },
 };
 if (tts.ok) { tts.load(); speechSynthesis.onvoiceschanged = () => tts.load(); }
 
@@ -140,6 +139,7 @@ function defaultSetup() {
 const saveSetup = () => store.set('ww-setup-v2', setup);
 
 function renderSetup() {
+  setTalking(false);
   stepsEl.hidden = true;
   statusEl.textContent = '';
   dock.innerHTML = '';
@@ -147,14 +147,14 @@ function renderSetup() {
   const provOpts = (sel) => config.providers.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''} ${p.available ? '' : 'disabled'}>${esc(p.label)}${p.available ? '' : '（キー未設定）'}</option>`).join('');
   const persOpts = (sel) => config.personalities.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
 
-  main.innerHTML = `<div class="stack">
+  main.innerHTML = `<div class="setup"><div class="stack">
     <section class="panel">
       <h2>村にウルフがひとり紛れている</h2>
       <p class="muted" style="margin:0">みんなに同じお題が配られますが、1人だけ少し違うお題を持っています。それが誰なのかは、AIにもあなたにも分かりません。</p>
       <ol class="muted" style="margin:8px 0 0;padding-left:1.4em">
         <li>ルーレットで話す順番を決めて、順番に<b>ひとこと</b>ずつ</li>
         <li>順番に、誰か1人に<b>質問</b>。聞かれた人が答える</li>
-        <li><b>1分間の自由会話</b>。@名前 で呼びかけ（複数・@all もOK）</li>
+        <li>もう一周、<b>質問</b>。1周目の答えをふまえて深掘り</li>
         <li>全員で<b>一斉投票</b>。ウルフが見破られても、多数派のお題を当てれば逆転勝利</li>
       </ol>
     </section>
@@ -166,12 +166,17 @@ function renderSetup() {
       </div>
       ${setup.humans === 2 ? '<p class="muted">2人のときは1台を交代で使います。お題の確認と投票のときは、相手に画面を見せないでください。</p>' : ''}
     </section>
+    <section class="panel row" style="justify-content:space-between">
+      <div><h3>AIの声</h3>${seg('voice', [[true, '読み上げる'], [false, '読み上げない']], setup.voice)}</div>
+      <p class="muted" style="margin:0;max-width:36ch">${mic.blocked ? 'このブラウザはマイク入力に対応していません。キーボードの音声入力なら使えます。' : 'マイクボタンで声でも話せます（Chrome / Edge / Safari）。'}</p>
+    </section>
+    </div><div class="stack">
     <section class="panel">
       <div class="row" style="justify-content:space-between"><h3 style="margin:0">AIの村人</h3>
         <div class="row"><button class="btn small" type="button" data-ai="-" ${setup.ais.length <= 2 ? 'disabled' : ''}>1人減らす</button>
         <button class="btn small" type="button" data-ai="+" ${setup.ais.length >= 4 ? 'disabled' : ''}>1人増やす</button></div></div>
       <p class="muted">それぞれ別々に考え、自分のお題と会話だけを手がかりにします。名前は声で呼びやすいものがおすすめです。</p>
-      <div class="ai-grid">${setup.ais.map((a, i) => {
+      <div class="ai-grid" style="--cols:${setup.ais.length === 3 ? 3 : 2}">${setup.ais.map((a, i) => {
         const prov = config.providers.find((p) => p.id === a.provider);
         return `<div class="ai-card" style="--c:var(--c-ai${i + 1})">
           <label class="f" for="an${i}">名前</label><input type="text" id="an${i}" data-ai-f="name" data-i="${i}" maxlength="10" value="${esc(a.name)}">
@@ -181,13 +186,9 @@ function renderSetup() {
         </div>`;
       }).join('')}</div>
     </section>
-    <section class="panel row" style="justify-content:space-between">
-      <div><h3>AIの声</h3>${seg('voice', [[true, '読み上げる'], [false, '読み上げない']], setup.voice)}</div>
-      <p class="muted" style="margin:0;max-width:36ch">${mic.blocked ? 'このブラウザはマイク入力に対応していません。キーボードの音声入力なら使えます。' : 'マイクボタンで声でも話せます（Chrome / Edge / Safari）。'}</p>
-    </section>
-    <div class="row" style="justify-content:center"><button class="btn moonlit big" type="button" id="start">ゲームを始める</button></div>
+    <div class="row start-row"><button class="btn moonlit big" type="button" id="start">ゲームを始める</button></div>
     ${ui.error ? `<p class="err" style="text-align:center">${esc(ui.error)}</p>` : ''}
-  </div>`;
+  </div></div>`;
 
   main.querySelectorAll('[data-set]').forEach((b) => b.onclick = () => {
     setup[b.dataset.set] = b.dataset.set === 'voice' ? b.dataset.val === 'true' : Number(b.dataset.val);
@@ -217,7 +218,7 @@ async function startGame() {
   try {
     tts.unlock();
     game = await api('games', { humans: setup.names.slice(0, setup.humans).map((name) => ({ name })), ais: setup.ais });
-    ui = { revealIdx: 0, shown: false, speaker: 'h1', rendered: 0, mode: '', target: null };
+    ui = { revealIdx: 0, shown: false, rendered: 0, mode: '', target: null };
     renderRoulette();
   } catch (e) {
     ui.error = e.message;
@@ -227,6 +228,7 @@ async function startGame() {
 
 // ---------- ルーレット ----------
 async function renderRoulette() {
+  setTalking(false);
   stepsEl.hidden = true;
   statusEl.textContent = '順番決め';
   dock.innerHTML = '';
@@ -256,6 +258,7 @@ async function renderRoulette() {
   const go = $('#go');
   go.hidden = false;
   go.onclick = renderReveal;
+  focusPrimary('#go');
 }
 
 // ---------- お題の確認 ----------
@@ -268,6 +271,7 @@ function renderReveal() {
       ${hs.length > 1 ? '<p>ほかの人は画面を見ないでください。</p>' : ''}
       <h2>${esc(h.name)}さんのお題</h2><p class="muted">あなたが多数派か、ウルフかは分かりません。</p>
       <button class="btn moonlit big" type="button" id="show">お題を見る</button></section>`;
+    focusPrimary('#show');
     $('#show').onclick = async () => {
       try { ui.word = (await post('word', { playerId: h.id })).word; ui.shown = true; renderReveal(); } catch (e) { alertMsg(e.message); }
     };
@@ -277,6 +281,7 @@ function renderReveal() {
   main.innerHTML = `<section class="panel cover"><p>${esc(h.name)}さんのお題は</p><div class="word">${esc(ui.word)}</div>
     <p class="muted">この言葉そのものは言わないように話しましょう。</p>
     <button class="btn moonlit big" type="button" id="next">${last ? '覚えた。村へ行く' : '覚えた。次の人へ渡す'}</button></section>`;
+  focusPrimary('#next');
   $('#next').onclick = async () => {
     ui.shown = false; ui.word = '';
     ui.revealIdx++;
@@ -294,15 +299,34 @@ function renderSteps() {
   stepsEl.innerHTML = STEPS.map((s) => `<div class="step ${game.turn === s.n ? 'now' : game.turn > s.n ? 'done' : ''}"><b>TURN ${s.n}</b><span>${s.label}</span></div>`).join('');
 }
 
+const TURN_NOTE = {
+  1: 'お題について、順番にひとことずつ話します。',
+  2: '順番に、誰か1人を選んで質問します。聞かれた人はその場で答えます。',
+  3: '質問の2周目です。1周目の答えをふまえて、怪しい人を深掘りしましょう。',
+};
+
 function renderTalkShell() {
-  main.innerHTML = '<div class="villagers" id="villagers"></div><div class="log" id="log"></div>';
+  main.innerHTML = '<div class="log" id="log"></div>';
+  sideEl.innerHTML = `<h3 class="side-h">話す順番</h3><div class="villagers" id="villagers"></div>
+    <div class="side-note" id="sidenote"></div>
+    <p class="side-keys">Enter で送信 ・ 質問の相手は名前を入れても選べます</p>`;
+  setTalking(true);
   ui.rendered = 0; ui.lastTurn = 0; ui.mode = '';
   dock.innerHTML = '';
 }
 
+function renderSideNote() {
+  const el = $('#sidenote'); if (!el) return;
+  const a = P(game.actorId);
+  const now = a ? (game.phase === 'qa' && game.qa.step === 'answer'
+    ? `いまは ${a.name}さんが ${P(game.qa.from).name}さんの質問に答える番`
+    : `いまは ${a.name}さんの番`) : '';
+  el.innerHTML = `<b>TURN ${game.turn}</b><p>${esc(TURN_NOTE[game.turn] || '')}</p>${now ? `<p class="now">${esc(now)}</p>` : ''}`;
+}
+
 function renderVillagers() {
   const el = $('#villagers'); if (!el) return;
-  const active = game.phase === 'free' ? game.free?.thinkingId : game.actorId;
+  const active = game.actorId;
   el.innerHTML = game.order.map((id, i) => {
     const p = P(id);
     return `<div class="v ${active === id ? 'speaking' : ''}" style="--c:${colorOf(p)}"><span class="no">${i + 1}</span>${face(p)}<div class="nm">${esc(p.name)}</div><div class="tg">${p.type === 'human' ? '人間' : esc(personalityLabel(p.personality))}</div></div>`;
@@ -314,10 +338,10 @@ function msgHtml(l) {
   const toNames = (l.to || []).map((id) => (id === 'all' ? '全員' : P(id)?.name)).filter(Boolean);
   const tag = l.kind === 'question' ? `<span class="to">→ ${esc(toNames.join('・'))}さんへ質問</span>`
     : l.kind === 'answer' ? `<span class="to">↩ ${esc(toNames.join('・'))}さんへの答え</span>` : '';
-  return `<div class="msg ${p.type} ${l.kind}" style="--c:${colorOf(p)}">${face(p)}<div class="bubble"><div class="who">${esc(p.name)}${tag}</div>${withMentions(l.text)}</div></div>`;
+  return `<div class="msg ${p.type} ${l.kind}" style="--c:${colorOf(p)}">${face(p)}<div class="bubble"><div class="who">${esc(p.name)}${tag}</div>${esc(l.text)}</div></div>`;
 }
 
-const TURN_TITLE = { 1: 'ひとことずつ', 2: '順番に質問', 3: '自由会話（1分）' };
+const TURN_TITLE = { 1: 'ひとことずつ', 2: '順番に質問（1周目）', 3: '順番に質問（2周目）' };
 
 function appendNewLog() {
   const log = $('#log'); if (!log) return;
@@ -329,15 +353,11 @@ function appendNewLog() {
     }
     $('#typing')?.remove();
     log.insertAdjacentHTML('beforeend', msgHtml(l));
-    if (P(l.playerId).type === 'ai') {
-      tts.say(l.text, l.playerId);
-      const called = humans().filter((h) => l.to?.includes(h.id) || l.to?.includes('all'));
-      if (l.kind === 'free' && called.length) hint(`${l.name}さんが ${called.map((h) => h.name).join('・')}さんを呼んでいます`);
-    }
+    if (P(l.playerId).type === 'ai') tts.say(l.text, l.playerId);
   }
   // 次に話す AI の「考え中」
   $('#typing')?.remove();
-  const thinking = game.phase === 'free' ? game.free?.thinkingId : (ui.pending && P(game.actorId)?.type === 'ai' ? game.actorId : null);
+  const thinking = ui.pending && P(game.actorId)?.type === 'ai' ? game.actorId : null;
   if (thinking) {
     const p = P(thinking);
     log.insertAdjacentHTML('beforeend', `<div class="msg typing" id="typing" style="--c:${colorOf(p)}">${face(p)}<div class="bubble"><div class="who">${esc(p.name)}</div><span class="dots"><i></i><i></i><i></i></span></div></div>`);
@@ -347,12 +367,11 @@ function appendNewLog() {
 
 /** いまの入力欄の種類。変わったときだけ作り直す（入力中の文字を消さないため）。 */
 function modeOf() {
-  if (game.phase === 'free') return 'free';
   const a = P(game.actorId);
   if (!a) return 'none';
   if (a.type === 'ai') return `ai:${a.id}:${game.phase}:${game.qa?.step || ''}`;
   if (game.phase === 'intro') return `intro:${a.id}`;
-  return game.qa.step === 'ask' ? `ask:${a.id}` : `answer:${a.id}:${game.cursor}`;
+  return game.qa.step === 'ask' ? `ask:${a.id}:${game.qaRound}` : `answer:${a.id}:${game.qaRound}:${game.cursor}`;
 }
 
 const MIC_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>';
@@ -403,26 +422,6 @@ function buildDock(mode) {
     const from = P(game.qa.from);
     const q = [...game.log].reverse().find((l) => l.kind === 'question');
     dock.innerHTML = composer({ banner: `<div class="banner ask">${esc(from.name)}さんから${esc(me.name)}さんへの質問:「${esc(q?.text || '')}」</div>`, placeholder: '答える' });
-  } else if (mode === 'free') {
-    const hs = humans();
-    ui.speaker = ui.speaker || hs[0].id;
-    dock.innerHTML = composer({
-      extra: `<div class="timer" id="timer"><span class="sec" id="sec">60</span><div class="meter"><i id="meter" style="width:100%"></i></div></div>
-        <div class="hint" id="queue"></div>
-        <div class="targets">${game.order.filter((id) => P(id).type === 'ai').map(P).map((p) => `<button type="button" class="target" data-m="${esc(p.name)}" style="--c:${colorOf(p)}">@${esc(p.name)}</button>`).join('')}<button type="button" class="target" data-m="all" style="--c:var(--moon)">@all</button></div>`,
-      placeholder: '@名前 で呼びかけ（例: @ミオ それ冬も使う？）',
-      tools: hs.length > 1 ? `<span class="hint">話す人</span><div class="seg" id="who">${hs.map((h) => `<button type="button" data-sp="${h.id}" aria-pressed="${ui.speaker === h.id}">${esc(h.name)}</button>`).join('')}</div>` : '',
-    });
-    dock.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => {
-      const box = $('#text');
-      const tag = `@${b.dataset.m} `;
-      if (!box.value.includes(tag)) box.value = (box.value ? `${box.value.trimEnd()} ` : '') + tag;
-      box.focus();
-    });
-    dock.querySelectorAll('[data-sp]').forEach((b) => b.onclick = () => {
-      ui.speaker = b.dataset.sp;
-      dock.querySelectorAll('[data-sp]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.sp === ui.speaker)));
-    });
   }
   $('#peek').onclick = peek;
   $('#mic').onclick = toggleMic;
@@ -448,8 +447,6 @@ async function submit(kind, pid) {
       }
       if (!target) return hint('質問する相手を選んでください（名前を入れて話してもOK）');
       game = await post('ask', { playerId: pid, targetId: target, text });
-    } else {
-      game = await post('say', { playerId: ui.speaker, text });
     }
     box.value = '';
     hint('');
@@ -461,7 +458,7 @@ async function submit(kind, pid) {
 
 function peek() {
   const hs = humans();
-  const h = hs.find((x) => x.id === (ui.mode.split(':')[1] || ui.speaker)) || hs[0];
+  const h = hs.find((x) => x.id === ui.mode.split(':')[1]) || hs[0];
   if (hs.length > 1 && !ui.peekArmed) {
     ui.peekArmed = true;
     hint(`${h.name}さん以外は画面を見ないでください。もう一度押すと表示します。`);
@@ -475,64 +472,25 @@ function peek() {
   }).catch((e) => hint(e.message));
 }
 
-function updateQueue() {
-  const el = $('#queue'); if (!el || !game.free) return;
-  const parts = [];
-  if (game.free.thinkingId) parts.push(`考え中: ${P(game.free.thinkingId).name}`);
-  if (game.free.queue.length) {
-    parts.push(`次: ${game.free.queue.map((q) => `${P(q.id).name}${q.fromId ? `（${P(q.fromId).name}から）` : ''}`).join('、')}`);
-  }
-  el.textContent = parts.join(' ／ ');
-}
-
-function updateTimer() {
-  if (game.phase !== 'free' || !game.free) return;
-  const left = Math.max(0, ui.freeEndsAt - Date.now());
-  const sec = Math.ceil(left / 1000);
-  const el = $('#sec'); if (!el) return;
-  el.textContent = String(sec);
-  $('#meter').style.width = `${(left / game.free.durationMs) * 100}%`;
-  $('#timer').classList.toggle('low', sec <= 10);
-  statusEl.textContent = `残り ${sec} 秒`;
-}
-
 // ---------- 進行の同期 ----------
-let pollTimer = null;
-let clockTimer = null;
-
 function update() {
   if (['voting', 'guess', 'finished'].includes(game.phase)) {
-    clearInterval(pollTimer); pollTimer = null;
-    clearInterval(clockTimer); clockTimer = null;
     stopMic();
     return renderAfterTalk();
   }
   renderSteps();
   if (!$('#log')) renderTalkShell();
   renderVillagers();
+  renderSideNote();
   appendNewLog();
   const mode = modeOf();
   if (mode !== ui.mode) buildDock(mode);
 
-  if (game.phase === 'free') {
-    ui.freeEndsAt = Date.now() + game.free.remainingMs;
-    if (!pollTimer) pollTimer = setInterval(poll, 700);
-    if (!clockTimer) clockTimer = setInterval(updateTimer, 250);
-    updateTimer();
-    updateQueue();
-  } else {
-    statusEl.textContent = `${game.turn}ターン目`;
-    if (mode.startsWith('ai:')) driveAI();
-  }
+  statusEl.textContent = `${game.turn}ターン目`;
+  if (mode.startsWith('ai:')) driveAI();
 }
 
-async function poll() {
-  if (ui.polling) return;
-  ui.polling = true;
-  try { game = await api(`games/${game.id}`); update(); } catch { /* 次の poll で再試行 */ } finally { ui.polling = false; }
-}
-
-/** 1・2ターン目の AI の手番。読み上げが終わってから次の AI を動かす。 */
+/** 1〜3ターン目の AI の手番。読み上げが終わってから次の AI を動かす。 */
 async function driveAI() {
   if (ui.pending) return;
   ui.pending = true;
@@ -553,6 +511,7 @@ async function driveAI() {
 
 // ---------- 投票・逆転・結果 ----------
 function renderAfterTalk() {
+  setTalking(false);
   dock.innerHTML = '';
   renderSteps();
   if (game.phase === 'voting') return renderVote();
@@ -572,13 +531,15 @@ function renderVote() {
   if (humans().length > 1 && ui.voteShownFor !== voter.id) {
     main.innerHTML = `<section class="panel cover">${runoff}<h2>${esc(voter.name)}さんの投票</h2><p>ほかの人は画面を見ないでください。</p><button class="btn moonlit big" type="button" id="open">投票する</button></section>`;
     $('#open').onclick = () => { ui.voteShownFor = voter.id; renderVote(); };
+    focusPrimary('#open');
     return;
   }
   const opts = game.candidates.filter((id) => id !== voter.id).map(P);
-  main.innerHTML = `<div class="stack"><section class="panel">${runoff}<h2>${esc(voter.name)}さん、ウルフだと思う人は？</h2>
-    <p class="muted">全員の票は、そろってから一斉に公開されます。</p>
-    <div class="choices">${opts.map((p) => `<button class="choice" type="button" data-v="${p.id}" style="--c:${colorOf(p)}">${face(p)}<div><b>${esc(p.name)}</b><div class="muted">${p.type === 'human' ? '人間' : esc(personalityLabel(p.personality))}</div></div></button>`).join('')}</div></section>
-    <details class="panel"><summary>会話を見返す</summary><div class="log" style="margin-top:10px">${game.log.map(msgHtml).join('')}</div></details></div>`;
+  main.innerHTML = `<div class="vote-layout"><section class="panel vote-main">${runoff}<h2>${esc(voter.name)}さん、ウルフだと思う人は？</h2>
+    <p class="muted">全員の票は、そろってから一斉に公開されます。${isWide() ? '数字キーでも選べます。' : ''}</p>
+    <div class="choices">${opts.map((p, i) => `<button class="choice" type="button" data-v="${p.id}" style="--c:${colorOf(p)}">${face(p)}<div><b>${esc(p.name)}</b><div class="muted">${p.type === 'human' ? '人間' : esc(personalityLabel(p.personality))}</div></div><kbd>${i + 1}</kbd></button>`).join('')}</div></section>
+    <details class="panel vote-log" ${isWide() ? 'open' : ''}><summary>会話を見返す</summary><div class="log" style="margin-top:10px">${game.log.map(msgHtml).join('')}</div></details></div>`;
+  ui.voteKeys = opts.map((p) => p.id);
   main.querySelectorAll('[data-v]').forEach((b) => b.onclick = async () => {
     const last = humans().filter((h) => !game.voted.includes(h.id)).length === 1;
     ui.voteShownFor = null;
@@ -628,7 +589,7 @@ function bars(s) {
   }).join('')}</div>`;
 }
 
-const THOUGHT_LABEL = { intro: '1ターン目・ひとこと', ask: '2ターン目・質問', answer: '2ターン目・回答', free: '3ターン目・自由会話', vote: '4ターン目・投票' };
+const THOUGHT_LABEL = { intro: 'ひとこと', ask: '質問', answer: '回答', vote: '投票' };
 
 function renderResult() {
   tts.stop();
@@ -636,7 +597,7 @@ function renderResult() {
   const w = P(game.wolfId);
   statusEl.textContent = 'ゲーム終了';
   const src = (t) => (t.source === 'fallback' ? `<span class="chip warn" title="${esc(t.error)}">API失敗</span>` : t.source === 'mock' ? '<span class="chip">オフライン</span>' : '');
-  main.innerHTML = `<div class="stack">
+  main.innerHTML = `<div class="result-layout"><div class="stack">
     <section class="panel verdict ${r.winner}">
       <div class="muted">${r.winner === 'wolf' ? 'WOLF WINS' : 'VILLAGE WINS'}</div>
       <div class="big">${r.winner === 'wolf' ? 'ウルフの勝ち' : '村人の勝ち'}</div>
@@ -649,18 +610,31 @@ function renderResult() {
       <thead><tr><th>投票した人</th><th>投票先</th><th>理由</th></tr></thead><tbody>
       ${game.order.map((id) => { const v = game.voteHistory[game.voteHistory.length - 1]?.votes[id]; const p = P(id); return v ? `<tr><td>${esc(p.name)}${id === game.wolfId ? ' <span class="wolfmark">ウルフ</span>' : ''}<div class="muted">${esc(game.words[id])}</div></td><td>${esc(P(v.target).name)}</td><td>${esc(v.reason || '—')}</td></tr>` : ''; }).join('')}
       </tbody></table></div></section>
+    <div class="row" style="justify-content:center"><button class="btn moonlit big" type="button" id="again">同じ設定でもう一度</button><button class="btn big" type="button" id="back">設定に戻る</button></div>
+    </div><div class="stack">
     <section class="panel stack"><div><h2>AIたちの頭の中</h2><p class="muted" style="margin:0">ゲーム中は見えなかった「だれが怪しいか」の変化と、それぞれの作戦です。</p></div>
-      ${aisOf().map((p, i) => `<details class="mind" ${i === 0 ? 'open' : ''} style="--c:${colorOf(p)}"><summary><b style="color:${colorOf(p)}">${esc(p.name)}</b> <span class="muted">${esc(personalityLabel(p.personality))}・${esc(providerLabel(p.provider))}${p.model ? ` (${esc(p.model)})` : ''}・お題「${esc(game.words[p.id])}」${p.id === game.wolfId ? '・ウルフ' : ''}</span></summary>
-        ${(game.thoughts[p.id] || []).map((t) => `<div class="think"><div class="meta">${THOUGHT_LABEL[t.kind] || t.kind}${typeof t.wolfSelf === 'number' && t.source === 'llm' && t.kind !== 'vote' ? `<span>自分がウルフだと思う確率 ${Math.round(t.wolfSelf * 100)}%</span>` : ''}${src(t)}</div>${bars(t.suspicions)}${t.strategy ? `<div class="thought">${esc(t.strategy)}</div>` : ''}</div>`).join('')}
+      ${aisOf().map((p, i) => `<details class="mind" ${i === 0 || isWide() ? 'open' : ''} style="--c:${colorOf(p)}"><summary><b style="color:${colorOf(p)}">${esc(p.name)}</b> <span class="muted">${esc(personalityLabel(p.personality))}・${esc(providerLabel(p.provider))}${p.model ? ` (${esc(p.model)})` : ''}・お題「${esc(game.words[p.id])}」${p.id === game.wolfId ? '・ウルフ' : ''}</span></summary>
+        ${(game.thoughts[p.id] || []).map((t) => `<div class="think"><div class="meta">${t.turn}ターン目・${THOUGHT_LABEL[t.kind] || t.kind}${typeof t.wolfSelf === 'number' && t.source === 'llm' && t.kind !== 'vote' ? `<span>自分がウルフだと思う確率 ${Math.round(t.wolfSelf * 100)}%</span>` : ''}${src(t)}</div>${bars(t.suspicions)}${t.strategy ? `<div class="thought">${esc(t.strategy)}</div>` : ''}</div>`).join('')}
       </details>`).join('')}
     </section>
     <details class="panel"><summary>会話をぜんぶ見る</summary><div class="log" style="margin-top:10px">${game.log.map(msgHtml).join('')}</div></details>
-    <div class="row" style="justify-content:center"><button class="btn moonlit big" type="button" id="again">同じ設定でもう一度</button><button class="btn big" type="button" id="back">設定に戻る</button></div>
-  </div>`;
+  </div></div>`;
   main.scrollTo({ top: 0 });
   $('#again').onclick = startGame;
+  focusPrimary('#again');
   $('#back').onclick = () => { game = null; renderSetup(); };
 }
+
+// ---------- キーボード ----------
+// 投票画面では数字キーで投票先を選べる（入力欄にいるときは無視）
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (game?.phase === 'voting' && /^[1-9]$/.test(e.key)) {
+    const id = ui.voteKeys?.[Number(e.key) - 1];
+    const btn = id && main.querySelector(`[data-v="${id}"]`);
+    if (btn) { e.preventDefault(); btn.click(); }
+  }
+});
 
 // ---------- 起動 ----------
 (async function init() {

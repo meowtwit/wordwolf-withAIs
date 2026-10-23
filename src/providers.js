@@ -155,14 +155,6 @@ export function readyIn(provider, now = Date.now()) {
   return Math.max(block, windowWait);
 }
 
-/** untilTs の時点で「直近1分」の枠がいくつ空いているか（制限なしなら Infinity）。 */
-export function capacityAt(provider, untilTs) {
-  const rpm = rpmOf(provider);
-  if (!rpm) return Infinity;
-  const used = (calls.get(provider) || []).filter((t) => t > untilTs - 60_000).length;
-  return rpm - used;
-}
-
 async function acquire(provider, maxWaitMs) {
   for (;;) {
     const wait = readyIn(provider);

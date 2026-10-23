@@ -80,7 +80,7 @@ input[type=text]:focus, select:focus { border-color: var(--moon); outline: none;
 .chip.warn { color: var(--wolf); border-color: var(--wolf); }
 
 /* 村人の列 */
-.villagers { display: flex; gap: 8px; overflow-x: auto; padding-block: 2px 10px; position: sticky; top: 0; z-index: 2; background: linear-gradient(var(--night) 80%, transparent); }
+.villagers { display: flex; gap: 8px; overflow-x: auto; padding-block: 2px 10px; }
 .v { flex: 0 0 auto; width: 84px; text-align: center; padding: 8px 4px; border-radius: 12px; border: 1px solid transparent; position: relative; }
 .v.speaking { border-color: var(--c); background: var(--night-2); }
 .v .face { width: 44px; height: 44px; margin: 0 auto 4px; }
@@ -103,7 +103,6 @@ input[type=text]:focus, select:focus { border-color: var(--moon); outline: none;
 .msg.human .bubble { border-radius: 16px 16px 4px 16px; background: #1d3a35; border-color: #2d5a50; }
 .msg.question .bubble { border-color: var(--moon); }
 .msg.typing .bubble { color: var(--mist-dim); }
-.mention { color: var(--moon); font-weight: 700; }
 .dots i { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--mist-dim); margin-right: 3px; animation: blink 1.2s infinite; }
 .dots i:nth-child(2) { animation-delay: .2s } .dots i:nth-child(3) { animation-delay: .4s }
 @keyframes blink { 0%, 80%, 100% { opacity: .2 } 40% { opacity: 1 } }
@@ -125,12 +124,6 @@ input[type=text]:focus, select:focus { border-color: var(--moon); outline: none;
 .targets { display: flex; gap: 6px; flex-wrap: wrap; }
 .target { border: 1px solid var(--line); background: var(--night); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
 .target[aria-pressed="true"] { background: var(--c); color: var(--night); border-color: var(--c); font-weight: 700; }
-.timer { display: flex; align-items: center; gap: 10px; }
-.timer .sec { font-family: var(--f-display); font-size: 22px; color: var(--moon); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
-.timer.low .sec { color: var(--wolf); }
-.meter { flex: 1; height: 6px; border-radius: 3px; background: var(--night-3); overflow: hidden; }
-.meter > i { display: block; height: 100%; background: var(--moon); transition: width .3s linear; }
-.timer.low .meter > i { background: var(--wolf); }
 
 /* ルーレット */
 .wheel { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin: 18px 0; }
@@ -175,6 +168,75 @@ details summary { cursor: pointer; }
 .thought { font-size: 13px; margin-top: 4px; }
 .err { color: var(--wolf); font-size: 14px; }
 .note { text-align: center; font-size: 13px; color: var(--mist-dim); }
+
+/* 話す順番の欄（スマホでは上に横並び、ノートPCでは右に縦並び） */
+.side-h, .side-note, .side-keys { display: none; }
+.choice kbd { display: none; }
+
+/* 設定・投票・結果の2列（ノートPCのみ。スマホでは縦に積む） */
+.setup, .result-layout, .vote-layout { display: flex; flex-direction: column; gap: 14px; }
+.start-row { justify-content: center; }
+
+@media (min-width: 1024px) {
+  body { font-size: 15.5px; }
+  .shell { max-width: 1280px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); }
+  header.top { padding-block: 12px 6px; }
+  .steps { padding-block: 0 8px; }
+  .step { display: flex; align-items: baseline; gap: 8px; padding: 6px 12px; font-size: 13px; }
+  .step b { display: inline; }
+
+  /* 会話中: 左に会話と入力欄、右に話す順番 */
+  .shell.talking {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 28px;
+  }
+  .shell.talking > header.top, .shell.talking > .steps { grid-column: 1 / -1; }
+  .shell.talking > main { grid-column: 1; grid-row: 3; padding-inline: 4px; }
+  .shell.talking > #dock { grid-column: 1; grid-row: 4; }
+  .shell.talking > .side { grid-column: 2; grid-row: 3 / span 2; overflow-y: auto; padding-block: 4px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .side-h { display: block; margin: 0; font-size: 12px; letter-spacing: .1em; color: var(--mist-dim); }
+  .side .villagers { flex-direction: column; overflow: visible; padding: 0; }
+  .side .v {
+    width: auto; text-align: left; display: grid; align-items: center; column-gap: 12px;
+    grid-template-columns: 18px 40px 1fr; grid-template-areas: "no face nm" "no face tg";
+    padding: 8px 12px; background: var(--night-2); border: 1px solid var(--line);
+  }
+  .side .v.speaking { border-color: var(--c); background: var(--night-3); }
+  .side .v .no { position: static; grid-area: no; font-size: 14px; }
+  .side .v .face { grid-area: face; margin: 0; width: 40px; height: 40px; }
+  .side .v .nm { grid-area: nm; font-size: 14px; }
+  .side .v .tg { grid-area: tg; }
+  .side-note { display: block; border: 1px solid var(--line); border-left: 3px solid var(--moon); border-radius: 10px; padding: 10px 12px; font-size: 13px; background: var(--night-2); }
+  .side-note b { font-family: var(--f-display); font-weight: 400; color: var(--moon); letter-spacing: .08em; }
+  .side-note p { margin: 4px 0 0; }
+  .side-note .now { color: var(--mist); font-weight: 700; }
+  .side-keys { display: block; margin: 0; font-size: 12px; color: var(--mist-dim); }
+
+  .bubble { max-width: min(70%, 620px); }
+  .composer { padding-block: 12px 16px; }
+
+  /* 設定: 左にルール・人間・声、右に AI */
+  .setup { display: grid; grid-template-columns: minmax(340px, 5fr) 7fr; gap: 20px; align-items: start; }
+  .setup .ai-grid { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 10px; }
+  .setup .ai-card { padding: 10px; }
+  .setup label.f { margin-top: 6px; }
+  .start-row { justify-content: flex-end; }
+
+  /* 投票: 左に投票先、右に会話の見返し */
+  .vote-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; align-items: start; }
+  .vote-log { max-height: calc(100vh - 190px); overflow-y: auto; }
+  .vote-main .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .choice { position: relative; }
+  .choice kbd { display: inline-block; margin-left: auto; font: 12px var(--f-body); color: var(--mist-dim); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
+
+  /* 結果: 左に勝敗・投票、右に AI の頭の中 */
+  .result-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+
+  .cover { max-width: 760px; margin-inline: auto; }
+  .wheel { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+}
 
 @media (max-width: 520px) {
   .steps .step span { display: none; }

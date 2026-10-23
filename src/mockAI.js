@@ -18,13 +18,6 @@ const ANSWERS = [
   (h) => `${h}と関係あると思うよ。`,
   () => '人によると思うけど、わたしはわりと好きだよ。',
 ];
-const FREE = [
-  (h) => `やっぱり${h}だよね。`,
-  (h, name) => (name ? `@${name} は${h}ってどう思う？` : `${h}の話、もっと聞きたいな。`),
-  (h, name) => (name ? `@${name} さっきの話、ちょっと気になる。` : 'なんか一人だけ違う気がするんだよね。'),
-  () => 'うんうん、わかる。',
-];
-
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 /** 公開ログから、自分のお題の連想語との一致度で疑い度を出す。 */
@@ -65,8 +58,7 @@ export function mockTurn(view, task) {
   let to;
   if (task.kind === 'intro') speech = pick(INTRO)(h);
   else if (task.kind === 'ask') { speech = pick(QUESTIONS)(h); to = suspectId; }
-  else if (task.kind === 'answer') speech = pick(ANSWERS)(h);
-  else speech = pick(FREE)(h, task.reason === 'idle' || Math.random() < 0.3 ? suspect?.name : null);
+  else speech = pick(ANSWERS)(h);
   return {
     speech,
     ...(to ? { to } : {}),
