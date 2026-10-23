@@ -2,18 +2,24 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Word Wolf with AIs</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>月夜のワードウルフ</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23f3d88b'/><circle cx='68' cy='40' r='38' fill='%230f1b26'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1><span class="logo">🐺</span> WORD WOLF <small>with AIs</small></h1>
-    <div id="status" class="status"></div>
-  </header>
-  <main id="app" aria-live="polite"></main>
-  <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
+  <div class="shell">
+    <header class="top">
+      <div class="brand"><div class="moon" aria-hidden="true"></div><h1>月夜のワードウルフ</h1></div>
+      <div class="status" id="status"></div>
+    </header>
+    <nav class="steps" id="steps" hidden></nav>
+    <main id="main" aria-live="polite"></main>
+    <div id="dock"></div>
+  </div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

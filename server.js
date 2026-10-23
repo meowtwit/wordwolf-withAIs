@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createGame, advance, humanSpeak, humanVote, humanGuess, publicState, wordFor, GameError,
+  createGame, startTalk, advance, humanSpeak, humanAsk, humanSay, humanVote, humanGuess, publicState, wordFor, stopTimers, GameError,
 } from './src/game.js';
 import { listProviders } from './src/providers.js';
 import { PERSONALITIES } from './src/ai.js';
@@ -23,7 +23,12 @@ const games = new Map();
 const GAME_TTL_MS = 6 * 60 * 60 * 1000;
 setInterval(() => {
   const now = Date.now();
-  for (const [id, g] of games) if (now - g.createdAt > GAME_TTL_MS) games.delete(id);
+  for (const [id, g] of games) {
+    if (now - g.createdAt > GAME_TTL_MS) {
+      stopTimers(g);
+      games.delete(id);
+    }
+  }
 }, 10 * 60 * 1000).unref();
 
 function send(res, status, body) {
@@ -79,11 +84,20 @@ async function handleApi(req, res, url) {
   switch (action) {
     case 'word':
       return send(res, 200, { word: wordFor(game, body.playerId) });
+    case 'start':
+      startTalk(game);
+      break;
     case 'advance':
       await advance(game);
       break;
     case 'speak':
       humanSpeak(game, body.playerId, body.text);
+      break;
+    case 'ask':
+      humanAsk(game, body.playerId, body.targetId, body.text);
+      break;
+    case 'say':
+      humanSay(game, body.playerId, body.text);
       break;
     case 'vote':
       await humanVote(game, body.playerId, body.targetId);

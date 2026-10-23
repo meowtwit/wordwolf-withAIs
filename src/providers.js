@@ -50,7 +50,7 @@ export function listProviders() {
       id: 'gemini',
       label: 'Google Gemini',
       available: Boolean(env('GEMINI_API_KEY')),
-      defaultModel: env('GEMINI_MODEL', 'gemini-2.5-flash'),
+      defaultModel: env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
     },
   ];
   for (const [id, p] of Object.entries(OPENAI_COMPATIBLE)) {
@@ -84,7 +84,7 @@ async function postJson(url, headers, body, timeoutMs) {
 async function callGemini({ model, system, user, temperature, timeoutMs }) {
   const key = env('GEMINI_API_KEY');
   if (!key) throw new Error('GEMINI_API_KEY が設定されていません');
-  const m = model || env('GEMINI_MODEL', 'gemini-2.5-flash');
+  const m = model || env('GEMINI_MODEL', 'gemini-flash-lite-latest');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`;
   const data = await postJson(
     url,
@@ -125,10 +125,88 @@ async function callOpenAICompatible(providerId, { model, system, user, temperatu
   return data?.choices?.[0]?.message?.content || '';
 }
 
-/** LLM を呼んでテキストを返す。 */
-export async function complete(provider, opts) {
-  const o = { temperature: 0.9, timeoutMs: 45000, ...opts };
+function callOnce(provider, o) {
   if (provider === 'gemini') return callGemini(o);
   if (OPENAI_COMPATIBLE[provider]) return callOpenAICompatible(provider, o);
   throw new Error(`未対応のプロバイダ: ${provider}`);
+}
+
+// ---- 1分あたりの呼び出し回数の管理 ----
+// 無料枠は「1分あたり◯回」の上限が厳しいので、超えそうなら呼ぶ前に待つ。
+// 429 が返ってきたら、Google が示す待ち時間（retryDelay）だけ止める。
+const RPM_DEFAULT = { gemini: 12, groq: 30, openrouter: 20, huggingface: 30, cerebras: 30, ollama: 0 };
+const calls = new Map(); // provider → 直近1分の呼び出し時刻
+const blockedUntil = new Map();
+
+function rpmOf(provider) {
+  const raw = process.env[`${provider.toUpperCase()}_RPM`];
+  const v = raw === undefined || raw === '' ? NaN : Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : (RPM_DEFAULT[provider] ?? 0);
+}
+
+/** あと何ミリ秒待てば呼べるか（0 なら今すぐ呼べる）。 */
+export function readyIn(provider, now = Date.now()) {
+  const block = Math.max(0, (blockedUntil.get(provider) || 0) - now);
+  const rpm = rpmOf(provider);
+  if (!rpm) return block;
+  const list = (calls.get(provider) || []).filter((t) => now - t < 60_000);
+  calls.set(provider, list);
+  const windowWait = list.length < rpm ? 0 : 60_000 - (now - list[0]) + 50;
+  return Math.max(block, windowWait);
+}
+
+/** untilTs の時点で「直近1分」の枠がいくつ空いているか（制限なしなら Infinity）。 */
+export function capacityAt(provider, untilTs) {
+  const rpm = rpmOf(provider);
+  if (!rpm) return Infinity;
+  const used = (calls.get(provider) || []).filter((t) => t > untilTs - 60_000).length;
+  return rpm - used;
+}
+
+async function acquire(provider, maxWaitMs) {
+  for (;;) {
+    const wait = readyIn(provider);
+    if (wait === 0) {
+      if (rpmOf(provider)) calls.get(provider).push(Date.now());
+      return;
+    }
+    if (wait > maxWaitMs) {
+      const e = new Error(`1分あたりの呼び出し上限のため ${Math.ceil(wait / 1000)} 秒待ちが必要`);
+      e.status = 429;
+      e.local = true;
+      throw e;
+    }
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
+
+function noteRateLimit(provider, err) {
+  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(err.message || '');
+  const sec = m ? Number(m[1]) : 10;
+  blockedUntil.set(provider, Date.now() + Math.min(sec, 60) * 1000);
+}
+
+/**
+ * LLM を呼んでテキストを返す。
+ * maxWaitMs: 回数上限で待つ最大時間（超えるなら待たずにエラー）。
+ * retry429: 429 が返ったとき、待ち時間が maxWaitMs 以内なら1回だけやり直す。
+ */
+export async function complete(provider, opts) {
+  const o = { temperature: 0.9, timeoutMs: 45000, retry429: true, maxWaitMs: 60000, ...opts };
+  await acquire(provider, o.maxWaitMs);
+  try {
+    return await callOnce(provider, o);
+  } catch (e) {
+    if (e.status !== 429) throw e;
+    noteRateLimit(provider, e);
+    if (!o.retry429) throw e;
+    await acquire(provider, o.maxWaitMs);
+    return callOnce(provider, o);
+  }
+}
+
+/** テスト用 */
+export function _resetRateLimits() {
+  calls.clear();
+  blockedUntil.clear();
 }
