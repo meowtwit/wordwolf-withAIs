@@ -15,6 +15,16 @@ Windows 用の配布 ZIP には Node.js を同梱しているので、インス�
 
 詳しくは ZIP の中の `README-Windows.txt` を見てください。配布 ZIP は `tools/package-windows.sh` で作れます。
 
+## 展示用の使い方（macOS）
+
+macOS 用の配布 ZIP には、Apple シリコン用と Intel 用の Node.js を同梱しています。
+
+1. ZIP を展開して、`start.command` をダブルクリック（最初の1回は「システム設定」→「プライバシーとセキュリティ」→「このまま開く」が必要なことがあります）
+2. Google Chrome か Microsoft Edge があれば全画面のキオスクモードで、なければ Safari で開く
+3. 設定は `admin.command`、終了は command + Q → `stop.command`
+
+詳しくは ZIP の中の `README-macOS.txt` を見てください。配布 ZIP は `tools/package-macos.sh` で作れます。
+
 ### 画面の流れ（お客さん向け）
 
 タイトル → 人数えらび（ひとり / ふたり）→ ルール説明（4枚）→ ルーレット → お題の確認 → ゲーム → 結果

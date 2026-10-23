@@ -15,7 +15,7 @@ mkdir -p "$APP"
 git -C "$ROOT" archive --format=tar HEAD | tar -x -C "$APP"
 mv "$APP"/windows/* "$APP"/
 rmdir "$APP/windows"
-rm -rf "$APP/tools" "$APP/.gitignore"
+rm -rf "$APP/tools" "$APP/macos" "$APP/.gitignore"
 
 mkdir -p "$WORK/nodezip" "$APP/node"
 unzip -q "$NODE_ZIP" '*/node.exe' '*/LICENSE' -d "$WORK/nodezip"
