@@ -76,6 +76,11 @@ export const DEFAULTS = {
     geminiKey: '',
     geminiModel: 'gemini-flash-lite-latest',
     geminiRpm: 12,
+    // Amazon Bedrock（AWS のクレジットで使える）
+    bedrockKey: '',
+    bedrockRegion: 'ap-northeast-1',
+    bedrockModel: 'global.amazon.nova-2-lite-v1:0',
+    bedrockRpm: 0,
   },
   characters: DEFAULT_CHARACTERS,
 };
@@ -108,6 +113,10 @@ export function normalize(input, base = DEFAULTS) {
       geminiKey: str(a.geminiKey, 200, base.api.geminiKey),
       geminiModel: str(a.geminiModel, 100, base.api.geminiModel) || DEFAULTS.api.geminiModel,
       geminiRpm: clampNum(a.geminiRpm, 0, 10000, base.api.geminiRpm),
+      bedrockKey: str(a.bedrockKey, 2000, base.api.bedrockKey ?? ''),
+      bedrockRegion: (str(a.bedrockRegion, 40, base.api.bedrockRegion ?? '') || DEFAULTS.api.bedrockRegion).replace(/[^a-z0-9-]/g, ''),
+      bedrockModel: str(a.bedrockModel, 200, base.api.bedrockModel ?? '') || DEFAULTS.api.bedrockModel,
+      bedrockRpm: clampNum(a.bedrockRpm, 0, 100000, base.api.bedrockRpm ?? 0),
     },
     characters: chars.slice(0, 8).map((c, i) => {
       const d = DEFAULT_CHARACTERS.find((x) => x.id === c?.id) || DEFAULT_CHARACTERS[i % DEFAULT_CHARACTERS.length];
@@ -131,6 +140,7 @@ export function normalize(input, base = DEFAULTS) {
 
 let current = null;
 const envKeyAtStart = process.env.GEMINI_API_KEY || '';
+const envBedrockKeyAtStart = process.env.BEDROCK_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK || '';
 
 /** 設定の API キーなどを環境変数に反映する（providers.js は環境変数を読む）。 */
 function applyEnv(s) {
@@ -139,6 +149,12 @@ function applyEnv(s) {
   else delete process.env.GEMINI_API_KEY;
   process.env.GEMINI_MODEL = s.api.geminiModel;
   process.env.GEMINI_RPM = String(s.api.geminiRpm);
+  const bkey = s.api.bedrockKey || envBedrockKeyAtStart;
+  if (bkey) process.env.BEDROCK_API_KEY = bkey;
+  else delete process.env.BEDROCK_API_KEY;
+  process.env.BEDROCK_REGION = s.api.bedrockRegion;
+  process.env.BEDROCK_MODEL = s.api.bedrockModel;
+  process.env.BEDROCK_RPM = String(s.api.bedrockRpm);
 }
 
 export function loadSettings() {
@@ -169,9 +185,12 @@ export function saveSettings(patch) {
     api: { ...prev.api, ...(patch.api || {}) },
   };
   if (!patch.api?.geminiKey) merged.api.geminiKey = prev.api.geminiKey;
+  if (!patch.api?.bedrockKey) merged.api.bedrockKey = prev.api.bedrockKey;
+  if (patch.clearBedrockKey) merged.api.bedrockKey = '';
   if (patch.adminPin === undefined || patch.adminPin === '****') merged.adminPin = prev.adminPin;
   if (patch.clearKey) merged.api.geminiKey = '';
   delete merged.clearKey;
+  delete merged.clearBedrockKey;
   const next = normalize(merged, prev);
   mkdirSync(DATA_DIR, { recursive: true });
   const tmp = `${FILE}.tmp`;
@@ -193,6 +212,12 @@ export function adminView(s = getSettings()) {
       hasKey: Boolean(key),
       keyTail: key ? key.slice(-4) : '',
       envKey: !key && Boolean(envKeyAtStart),
+      bedrockRegion: s.api.bedrockRegion,
+      bedrockModel: s.api.bedrockModel,
+      bedrockRpm: s.api.bedrockRpm,
+      hasBedrockKey: Boolean(s.api.bedrockKey),
+      bedrockKeyTail: s.api.bedrockKey ? s.api.bedrockKey.slice(-4) : '',
+      envBedrockKey: !s.api.bedrockKey && Boolean(envBedrockKeyAtStart),
     },
     adminPin: s.adminPin ? '****' : '',
     hasPin: Boolean(s.adminPin),

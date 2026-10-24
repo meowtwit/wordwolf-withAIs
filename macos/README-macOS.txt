@@ -42,6 +42,18 @@ Node.js などのインストールは不要です。このフォルダだけで
 ・お客さんに触られたくないときは、管理画面で PIN を設定してください。
 
 
+■ AWS（Amazon Bedrock）の AI を使う
+-----------------
+Gemini の回数制限にかかるときは、AWS のクレジットで使える Amazon Bedrock に切り替えられます。
+1. AWS にログインして Amazon Bedrock のコンソールを開く（リージョンは「東京」）
+   https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create
+2. 「API キー」→「長期 API キーを生成」でキーを作り、コピーする
+3. 管理画面の「AI との接続（Amazon Bedrock / AWS）」にキーを貼り付ける
+4. 「キャラクター全員を Bedrock にする」→「保存する」→「接続テスト」
+おすすめのモデルは Amazon Nova 2 Lite（global.amazon.nova-2-lite-v1:0）です。
+Claude など Amazon 以外のモデルは AWS Marketplace 経由の請求になり、
+AWS のクレジットが使えないことがあります。
+
 ■ 終わるとき
 -----------------
 1. ゲーム画面で command + Q（全画面のブラウザが閉じます）

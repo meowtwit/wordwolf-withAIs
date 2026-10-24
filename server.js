@@ -104,9 +104,9 @@ function buildGameConfig(humanCount) {
       color: c.color,
       tagline: c.tagline,
       voicePitch: c.voicePitch,
-      // キーがない等で使えないときはオフライン AI で代行
-      provider: providerAvailable(c.provider) ? c.provider : 'mock',
-      model: c.model,
+      // 選んだ AI のキーがないときは、キーのある別の AI（Bedrock → Gemini の順）、それもなければオフライン AI で代行
+      provider: providerAvailable(c.provider) ? c.provider : (['bedrock', 'gemini'].find(providerAvailable) || 'mock'),
+      model: providerAvailable(c.provider) ? c.model : '',
     })),
   };
 }

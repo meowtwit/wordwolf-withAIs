@@ -52,7 +52,8 @@ function render() {
   const k = S.kiosk;
   const a = S.api;
   const enabled = S.characters.filter((c) => c.enabled).length;
-  const keyState = a.hasKey ? `<span class="ok">設定済み（末尾 ${esc(a.keyTail)}）</span>` : a.envKey ? '<span class="ok">.env のキーを使用中</span>' : '<span class="warn">未設定（AIはオフラインの簡易モードで話します）</span>';
+  const bkeyState = a.hasBedrockKey ? `<span class="ok">設定済み（末尾 ${esc(a.bedrockKeyTail)}）</span>` : a.envBedrockKey ? '<span class="ok">環境変数のキーを使用中</span>' : '<span class="muted">未設定</span>';
+  const keyState = a.hasKey ? `<span class="ok">設定済み（末尾 ${esc(a.keyTail)}）</span>` : a.envKey ? '<span class="ok">.env のキーを使用中</span>' : '<span class="muted">未設定</span>';
   app.innerHTML = `
     <header class="row" style="justify-content:space-between">
       <div class="brand"><div class="moon" aria-hidden="true"></div><h1>月夜のワードウルフ　管理画面</h1></div>
@@ -71,7 +72,36 @@ function render() {
         <div><label class="f" for="rpm">1分あたりの呼び出し上限</label><input type="number" id="rpm" min="0" max="10000" value="${a.geminiRpm}">
           <p class="hint">無料枠は15回/分なので 12 がおすすめ。有料にしたら 0（制限なし）や 300 などに。</p></div>
       </div>
-      <div class="row" style="margin-top:12px"><button class="btn" type="button" id="test">接続テスト（AIを1回呼ぶ）</button><span class="hint">保存してからテストしてください</span></div>
+      <div class="row" style="margin-top:12px"><button class="btn small" type="button" data-all="gemini">キャラクター全員を Gemini にする</button></div>
+    </section>
+
+    <section class="panel">
+      <h2>AI との接続（Amazon Bedrock / AWS）</h2>
+      <p class="lead muted">AWS のクレジットで使えます。<a href="https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create" target="_blank" rel="noopener" style="color:var(--moon)">Bedrock のコンソール</a>で「長期 API キー」を作って貼り付けてください。
+        おすすめは Amazon 自身のモデル <b>Nova 2 Lite</b>（クレジットで支払えます）。Claude などほかの会社のモデルは AWS Marketplace 経由の請求になり、クレジットが使えないことがあります。</p>
+      <div class="grid2">
+        <div><label class="f" for="bkey">Bedrock の API キー　${bkeyState}</label>
+          <input type="password" id="bkey" placeholder="${a.hasBedrockKey ? '変えるときだけ入力' : 'ABSK... で始まるキー'}" autocomplete="off">
+          ${a.hasBedrockKey ? '<label class="check" style="margin-top:6px"><input type="checkbox" id="clearBkey"> 保存されているキーを消す</label>' : ''}</div>
+        <div><label class="f" for="bregion">リージョン</label><input type="text" id="bregion" value="${esc(a.bedrockRegion)}">
+          <p class="hint">東京は ap-northeast-1（キーを作ったリージョンに合わせる）</p></div>
+        <div><label class="f" for="bmodel">モデル ID</label><input type="text" id="bmodel" list="bmodels" value="${esc(a.bedrockModel)}">
+          <datalist id="bmodels">
+            <option value="global.amazon.nova-2-lite-v1:0">Amazon Nova 2 Lite（おすすめ・クレジット可）</option>
+            <option value="jp.amazon.nova-2-lite-v1:0">Amazon Nova 2 Lite（日本国内で処理）</option>
+            <option value="jp.anthropic.claude-haiku-5-5">Claude Haiku 5.5（Marketplace 請求）</option>
+            <option value="global.anthropic.claude-haiku-5-5">Claude Haiku 5.5 global（Marketplace 請求）</option>
+          </datalist>
+          <p class="hint">候補から選ぶか、Bedrock の「モデルカタログ」に出ている ID を入力。</p></div>
+        <div><label class="f" for="brpm">1分あたりの呼び出し上限</label><input type="number" id="brpm" min="0" max="100000" value="${a.bedrockRpm}">
+          <p class="hint">0 で制限なし（AWS 側の上限に達したら自動で少し待ちます）</p></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn small" type="button" data-all="bedrock">キャラクター全員を Bedrock にする</button></div>
+    </section>
+
+    <section class="panel">
+      <h2>接続テスト</h2>
+      <div class="row"><button class="btn" type="button" id="test">接続テスト（AIを1回呼ぶ）</button><span class="hint">保存してからテストしてください。下のキャラクターごとのボタンでも試せます</span></div>
       <div id="testout"></div>
     </section>
 
@@ -87,7 +117,7 @@ function render() {
             <div class="full"><label class="f">性格（AIへの指示。お客さんには見えません）</label><textarea data-f="personality" maxlength="400">${esc(c.personality)}</textarea></div>
             <div class="full"><label class="f">話し方・口ぐせ</label><textarea data-f="speech" maxlength="200" style="min-height:50px">${esc(c.speech)}</textarea></div>
             <div><label class="f">AI</label><select data-f="provider">${provOpts(c.provider)}</select></div>
-            <div><label class="f">モデル（空欄で上の設定）</label><input type="text" data-f="model" value="${esc(c.model)}" placeholder="${esc(a.geminiModel)}"></div>
+            <div><label class="f">モデル（空欄で上の設定）</label><input type="text" data-f="model" value="${esc(c.model)}" placeholder="${esc(c.provider === 'bedrock' ? a.bedrockModel : a.geminiModel)}"></div>
             <div><label class="f">テーマ色</label><input type="color" data-f="color" value="${esc(c.color)}"></div>
             <div><label class="f">声の高さ <span data-pitch>${c.voicePitch}</span></label><div class="row" style="flex-wrap:nowrap"><input type="range" min="0.5" max="2" step="0.05" data-f="voicePitch" value="${c.voicePitch}"><button class="btn small" type="button" data-voice>試す</button></div></div>
             <div class="full"><label class="f">画像ファイル（public フォルダからの場所）</label><input type="text" data-f="image" value="${esc(c.image)}"></div>
@@ -174,6 +204,11 @@ function bind() {
     card.querySelector('[data-test]').onclick = () => runTest(S.characters[i].id);
   });
   $('#test').onclick = () => runTest(S.characters.find((c) => c.enabled)?.id);
+  app.querySelectorAll('[data-all]').forEach((b) => b.onclick = () => {
+    for (const c of S.characters) { c.provider = b.dataset.all; c.model = ''; }
+    render();
+    markDirty();
+  });
   $('#shutdown').onclick = async () => {
     if (!confirm('サーバーを止めますか？ ゲーム画面も使えなくなります。')) return;
     try { await api('shutdown', {}); } catch { /* 止まると返事が来ないことがある */ }
@@ -207,12 +242,21 @@ function collect() {
       idleSec: Number($('#idleSec').value),
       resultSec: Number($('#resultSec').value),
     },
-    api: { geminiModel: $('#model').value.trim(), geminiRpm: Number($('#rpm').value) },
+    api: {
+      geminiModel: $('#model').value.trim(),
+      geminiRpm: Number($('#rpm').value),
+      bedrockRegion: $('#bregion').value.trim(),
+      bedrockModel: $('#bmodel').value.trim(),
+      bedrockRpm: Number($('#brpm').value),
+    },
     characters: S.characters.map(({ id, name, image, color, voicePitch, tagline, personality, speech, enabled, provider, model }) => ({ id, name, image, color, voicePitch, tagline, personality, speech, enabled, provider, model })),
   };
   const key = $('#key').value.trim();
   if (key) body.api.geminiKey = key;
   if ($('#clearKey')?.checked) body.clearKey = true;
+  const bkey = $('#bkey').value.trim();
+  if (bkey) body.api.bedrockKey = bkey;
+  if ($('#clearBkey')?.checked) body.clearBedrockKey = true;
   const np = $('#newPin').value;
   if (np) body.adminPin = np;
   if ($('#clearPin')?.checked) body.adminPin = '';

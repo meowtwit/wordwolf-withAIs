@@ -37,7 +37,7 @@ macOS 用の配布 ZIP には、Apple シリコン用と Intel 用の Node.js �
 
 お客さん向けの画面（`index.html`）には設定を出しません。次の設定は管理画面で行い、`data/settings.json` に保存されます。
 
-- Gemini の APIキー・モデル・1分あたりの呼び出し上限、接続テスト
+- Gemini / Amazon Bedrock の APIキー・モデル・1分あたりの呼び出し上限、接続テスト、キャラクター全員の AI の切り替え
 - キャラクター（名前・ひとこと紹介・性格・話し方・テーマ色・声の高さ・画像・出場するか）
 - 1ゲームに出る AI の人数（有効なキャラクターからランダムに選ばれる）、「ふたりで あそぶ」・読み上げ・マイク・「AIたちの頭の中」の表示
 - 放置したときにタイトルへ戻るまでの秒数、管理画面の PIN、サーバーの停止
@@ -119,6 +119,7 @@ npm start              # → http://localhost:3000 （管理画面は /admin.htm
 | --- | --- | --- | --- |
 | `mock` | オフライン（APIなし） | — | ルールベース |
 | `gemini` | Google Gemini API | `GEMINI_API_KEY` | `gemini-flash-lite-latest` |
+| `bedrock` | Amazon Bedrock（AWS。Converse API を Bedrock の API キーで呼ぶ） | `BEDROCK_API_KEY`・`BEDROCK_REGION` | `global.amazon.nova-2-lite-v1:0` |
 | `groq` | GroqCloud | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
 | `openrouter` | OpenRouter | `OPENROUTER_API_KEY` | `meta-llama/llama-3.3-70b-instruct:free` |
 | `huggingface` | Hugging Face Inference Providers | `HF_TOKEN` | `meta-llama/Llama-3.1-8B-Instruct` |

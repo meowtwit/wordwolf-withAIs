@@ -52,6 +52,12 @@ export function listProviders() {
       available: Boolean(env('GEMINI_API_KEY')),
       defaultModel: env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
     },
+    {
+      id: 'bedrock',
+      label: 'Amazon Bedrock (AWS)',
+      available: Boolean(bedrockKey()),
+      defaultModel: env('BEDROCK_MODEL', BEDROCK_DEFAULT_MODEL),
+    },
   ];
   for (const [id, p] of Object.entries(OPENAI_COMPATIBLE)) {
     list.push({
@@ -125,8 +131,44 @@ async function callOpenAICompatible(providerId, { model, system, user, temperatu
   return data?.choices?.[0]?.message?.content || '';
 }
 
+// ---- Amazon Bedrock（AWS）: Bedrock の API キーで Converse API を呼ぶ ----
+// 既定は Amazon 自身のモデル Nova 2 Lite（AWS のクレジットで支払える）。
+// Claude などのサードパーティモデルは AWS Marketplace 経由の請求になり、クレジットが使えないことがある。
+export const BEDROCK_DEFAULT_MODEL = 'global.amazon.nova-2-lite-v1:0';
+const bedrockKey = () => env('BEDROCK_API_KEY') || env('AWS_BEARER_TOKEN_BEDROCK');
+
+async function callBedrock({ model, system, user, temperature, timeoutMs }) {
+  const key = bedrockKey();
+  if (!key) throw new Error('Bedrock の API キーが設定されていません');
+  const region = env('BEDROCK_REGION', 'ap-northeast-1');
+  const m = model || env('BEDROCK_MODEL', BEDROCK_DEFAULT_MODEL);
+  const base = env('BEDROCK_ENDPOINT', `https://bedrock-runtime.${region}.amazonaws.com`);
+  const url = `${base.replace(/\/$/, '')}/model/${encodeURIComponent(m)}/converse`;
+  const body = {
+    system: [{ text: system }],
+    messages: [{ role: 'user', content: [{ text: user }] }],
+    inferenceConfig: { temperature, maxTokens: 1000 },
+  };
+  const headers = { Authorization: `Bearer ${key}` };
+  let data;
+  if (/anthropic\.claude/.test(m)) {
+    // Claude は考えてから答える機能を切って速くする（使えないモデルなら外してやり直す）
+    try {
+      data = await postJson(url, headers, { ...body, additionalModelRequestFields: { thinking: { type: 'disabled' } } }, timeoutMs);
+    } catch (e) {
+      if (e.status !== 400) throw e;
+      data = await postJson(url, headers, body, timeoutMs);
+    }
+  } else {
+    data = await postJson(url, headers, body, timeoutMs);
+  }
+  const content = data?.output?.message?.content || [];
+  return content.map((c) => c.text || '').join('');
+}
+
 function callOnce(provider, o) {
   if (provider === 'gemini') return callGemini(o);
+  if (provider === 'bedrock') return callBedrock(o);
   if (OPENAI_COMPATIBLE[provider]) return callOpenAICompatible(provider, o);
   throw new Error(`未対応のプロバイダ: ${provider}`);
 }
@@ -134,7 +176,7 @@ function callOnce(provider, o) {
 // ---- 1分あたりの呼び出し回数の管理 ----
 // 無料枠は「1分あたり◯回」の上限が厳しいので、超えそうなら呼ぶ前に待つ。
 // 429 が返ってきたら、Google が示す待ち時間（retryDelay）だけ止める。
-const RPM_DEFAULT = { gemini: 12, groq: 30, openrouter: 20, huggingface: 30, cerebras: 30, ollama: 0 };
+const RPM_DEFAULT = { gemini: 12, bedrock: 0, groq: 30, openrouter: 20, huggingface: 30, cerebras: 30, ollama: 0 };
 const calls = new Map(); // provider → 直近1分の呼び出し時刻
 const blockedUntil = new Map();
 
